@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>雙圖合併工具</title>
+  <style>
+    :root{
+      --bg1:#f5f7fb;
+      --bg2:#eef2ff;
+      --card:#ffffffcc;
+      --line:#dbe3f0;
+      --text:#1f2a44;
+      --muted:#6b7280;
+      --primary:#4f46e5;
+      --primary2:#7c3aed;
+      --danger:#ef4444;
+      --shadow:0 20px 40px rgba(79,70,229,.12);
+      --radius:24px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: "PingFang TC","Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, #e0e7ff 0%, transparent 28%),
+        radial-gradient(circle at bottom right, #ede9fe 0%, transparent 25%),
+        linear-gradient(135deg,var(--bg1),var(--bg2));
+      min-height:100vh;
+    }
+    .wrap{
+      max-width:1280px;
+      margin:0 auto;
+      padding:28px 20px 48px;
+    }
+    .hero{
+      text-align:center;
+      margin-bottom:24px;
+    }
+    .hero h1{
+      margin:0 0 10px;
+      font-size:clamp(28px,4vw,42px);
+      font-weight:800;
+      letter-spacing:.5px;
+    }
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      font-size:15px;
+    }
+    .panel{
+      background:var(--card);
+      backdrop-filter: blur(12px);
+      border:1px solid rgba(255,255,255,.8);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+      padding:22px;
+    }
+    .card{
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:#fff;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+      min-height:420px;
+    }
+    .card h2{
+      margin:0;
+      font-size:20px;
+    }
+    .sub{
+      margin-top:-6px;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .dropzone{
+      border:2px dashed #c7d2fe;
+      border-radius:20px;
+      background:linear-gradient(180deg,#fafbff,#f6f8ff);
+      min-height:230px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:16px;
+      position:relative;
+      overflow:hidden;
+      transition:.2s ease;
+    }
+    .dropzone.dragover{
+      border-color:var(--primary);
+      background:#eef2ff;
+      transform:translateY(-2px);
+    }
+    .dropzone img{
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      border-radius:14px;
+      box-shadow:0 8px 25px rgba(0,0,0,.08);
+    }
+    .placeholder{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      color:var(--muted);
+      pointer-events:none;
+    }
+    .placeholder .icon{
+      font-size:42px;
+    }
+    .actions{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    button, .fake-btn{
+      border:none;
+      border-radius:14px;
+      padding:12px 18px;
+      font-size:15px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.2s ease;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,var(--primary),var(--primary2));
+      color:#fff;
+      box-shadow:0 10px 24px rgba(79,70,229,.25);
+    }
+    .btn-primary:hover{transform:translateY(-1px)}
+    .btn-secondary{
+      background:#eef2ff;
+      color:var(--primary);
+    }
+    .btn-danger{
+      background:#fef2f2;
+      color:var(--danger);
+    }
+    .file-input{display:none}
+    .size-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .field label{
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+    }
+    .field input{
+      width:100%;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      outline:none;
+      font-size:15px;
+      background:#fcfcff;
+    }
+    .field input:focus{
+      border-color:#a5b4fc;
+      box-shadow:0 0 0 4px rgba(99,102,241,.12);
+    }
+    .merge-bar{
+      padding:0 22px 22px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .big-merge{
+      width:100%;
+      padding:18px 24px;
+      border-radius:20px;
+      font-size:22px;
+      letter-spacing:1px;
+    }
+    .hint{
+      color:var(--muted);
+      font-size:13px;
+      text-align:center;
+    }
+    .result{
+      margin-top:10px;
+      border:1px solid var(--line);
+      border-radius:22px;
+      background:#fff;
+      padding:20px;
+    }
+    .result-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:16px;
+    }
+    .result-head h3{
+      margin:0;
+      font-size:22px;
+    }
+    canvas{
+      width:100%;
+      max-width:100%;
+      background-image:
+        linear-gradient(45deg, #eef2f7 25%, transparent 25%),
+        linear-gradient(-45deg, #eef2f7 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #eef2f7 75%),
+        linear-gradient(-45deg, transparent 75%, #eef2f7 75%);
+      background-size:24px 24px;
+      background-position:0 0, 0 12px, 12px -12px, -12px 0px;
+      border-radius:16px;
+      border:1px solid #e5e7eb;
+      display:block;
+      margin:0 auto;
+    }
+    .footer-note{
+      margin-top:14px;
+      color:var(--muted);
+      font-size:13px;
+    }
+    @media (max-width: 900px){
+      .grid{grid-template-columns:1fr}
+      .card{min-height:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>雙圖合併工具</h1>
+      <p>左圖會壓在上層、右圖作為底圖。支援按鈕上傳與拖拉放圖，並可自訂兩張圖的寬高。</p>
+    </div>
+
+    <div class="panel">
+      <div class="grid">
+        <section class="card">
+          <h2>左邊圖片（上層）</h2>
+          <div class="sub">合併時會置中壓在右邊底圖上</div>
+
+          <div id="dropLeft" class="dropzone">
+            <div class="placeholder" id="placeholderLeft">
+              <div class="icon">🖼️</div>
+              <div>拖拉圖片到這裡</div>
+              <div>或按下方按鈕上傳</div>
+            </div>
+            <img id="previewLeft" style="display:none;" alt="左圖預覽">
+          </div>
+
+          <div class="actions">
+            <label class="fake-btn btn-secondary" for="fileLeft">選擇左圖</label>
+            <button class="btn-danger" type="button" id="clearLeft">清除左圖</button>
+            <input class="file-input" type="file" id="fileLeft" accept="image/*">
+          </div>
+
+          <div class="field">
+            <label>左圖縮放方式</label>
+            <div class="actions">
+              <label class="fake-btn btn-secondary" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="leftFitMode" value="height" checked>
+                對齊高度
+              </label>
+              <label class="fake-btn btn-secondary" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="leftFitMode" value="width">
+                對齊寬度
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>右邊圖片（底圖）</h2>
+          <div class="sub">合併後的畫布大小會以右邊圖片的設定尺寸為主</div>
+
+          <div id="dropRight" class="dropzone">
+            <div class="placeholder" id="placeholderRight">
+              <div class="icon">🧩</div>
+              <div>拖拉圖片到這裡</div>
+              <div>或按下方按鈕上傳</div>
+            </div>
+            <img id="previewRight" style="display:none;" alt="右圖預覽">
+          </div>
+
+          <div class="actions">
+            <label class="fake-btn btn-secondary" for="fileRight">選擇右圖</label>
+            <button class="btn-danger" type="button" id="clearRight">清除右圖</button>
+            <input class="file-input" type="file" id="fileRight" accept="image/*">
+          </div>
+
+          <div class="size-grid">
+            <div class="field">
+              <label for="rightWidth">右圖寬度 (px)</label>
+              <input id="rightWidth" type="number" min="1" placeholder="例如 100">
+            </div>
+            <div class="field">
+              <label for="rightHeight">右圖高度 (px)</label>
+              <input id="rightHeight" type="number" min="1" placeholder="例如 200">
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="merge-bar">
+        <button id="mergeBtn" class="btn-primary big-merge" type="button">合併</button>
+        <div class="hint">範例：勾選「對齊高度」時，左圖會等比例縮放到與右圖同高，並在畫面中央置中。</div>
+
+        <div class="result" style="padding:18px;">
+          <div class="field">
+            <label for="fadeRange">融合刷淡寬度：<span id="fadeValue">10</span> px</label>
+            <input id="fadeRange" type="range" min="5" max="300" step="1" value="10" style="width:100%;">
+          </div>
+          <div class="footer-note">
+            高度對齊：左右邊緣刷淡；寬度對齊：上下邊緣刷淡。
+          </div>
+        </div>
+
+        <section class="result">
+          <div class="result-head">
+            <h3>合併結果</h3>
+            <div class="actions">
+              <button id="downloadBtn" class="btn-primary" type="button">下載 PNG</button>
+              <button id="resetAllBtn" class="btn-secondary" type="button">全部重置</button>
+            </div>
+          </div>
+
+          <canvas id="resultCanvas" width="600" height="400"></canvas>
+          <div class="footer-note">提示：右圖可手動設定寬高；左圖會依「對齊高度 / 對齊寬度」等比例縮放後置中，並可用滑桿調整邊緣融合寬度。</div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileLeft = document.getElementById('fileLeft');
+    const fileRight = document.getElementById('fileRight');
+    const previewLeft = document.getElementById('previewLeft');
+    const previewRight = document.getElementById('previewRight');
+    const placeholderLeft = document.getElementById('placeholderLeft');
+    const placeholderRight = document.getElementById('placeholderRight');
+    const dropLeft = document.getElementById('dropLeft');
+    const dropRight = document.getElementById('dropRight');
+
+    const rightWidthInput = document.getElementById('rightWidth');
+    const rightHeightInput = document.getElementById('rightHeight');
+
+    const clearLeftBtn = document.getElementById('clearLeft');
+    const clearRightBtn = document.getElementById('clearRight');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resetAllBtn = document.getElementById('resetAllBtn');
+    const fadeRange = document.getElementById('fadeRange');
+    const fadeValue = document.getElementById('fadeValue');
+
+    const canvas = document.getElementById('resultCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let leftImage = null;
+    let rightImage = null;
+
+    fadeRange.addEventListener('input', () => {
+      fadeValue.textContent = fadeRange.value;
+      if (leftImage && rightImage) {
+        mergeImages();
+      }
+    });
+
+    document.querySelectorAll('input[name="leftFitMode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        if (leftImage && rightImage) {
+          mergeImages();
+        }
+      });
+    });
+
+    rightWidthInput.addEventListener('input', () => {
+      if (leftImage && rightImage) {
+        mergeImages();
+      }
+    });
+
+    rightHeightInput.addEventListener('input', () => {
+      if (leftImage && rightImage) {
+        mergeImages();
+      }
+    });
+
+    function loadImageFile(file, side) {
+      if (!file || !file.type.startsWith('image/')) {
+        alert('請上傳圖片檔案');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          if (side === 'left') {
+            leftImage = img;
+            previewLeft.src = e.target.result;
+            previewLeft.style.display = 'block';
+            placeholderLeft.style.display = 'none';
+            
+          } else {
+            rightImage = img;
+            previewRight.src = e.target.result;
+            previewRight.style.display = 'block';
+            placeholderRight.style.display = 'none';
+            if (!rightWidthInput.value) rightWidthInput.value = img.naturalWidth;
+            if (!rightHeightInput.value) rightHeightInput.value = img.naturalHeight;
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    fileLeft.addEventListener('change', (e) => loadImageFile(e.target.files[0], 'left'));
+    fileRight.addEventListener('change', (e) => loadImageFile(e.target.files[0], 'right'));
+
+    function setupDropzone(zone, side) {
+      ['dragenter', 'dragover'].forEach(evt => {
+        zone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          zone.classList.remove('dragover');
+        });
+      });
+
+      zone.addEventListener('drop', (e) => {
+        const file = e.dataTransfer.files[0];
+        loadImageFile(file, side);
+      });
+    }
+
+    setupDropzone(dropLeft, 'left');
+    setupDropzone(dropRight, 'right');
+
+    clearLeftBtn.addEventListener('click', () => {
+      leftImage = null;
+      fileLeft.value = '';
+      previewLeft.src = '';
+      previewLeft.style.display = 'none';
+      placeholderLeft.style.display = 'flex';
+      document.querySelector('input[name="leftFitMode"][value="height"]').checked = true;
+    });
+
+    clearRightBtn.addEventListener('click', () => {
+      rightImage = null;
+      fileRight.value = '';
+      previewRight.src = '';
+      previewRight.style.display = 'none';
+      placeholderRight.style.display = 'flex';
+      rightWidthInput.value = '';
+      rightHeightInput.value = '';
+    });
+
+    function getPositiveNumber(input, fallback) {
+      const n = Number(input.value);
+      return Number.isFinite(n) && n > 0 ? n : fallback;
+    }
+
+    function drawEmptyState() {
+      canvas.width = 600;
+      canvas.height = 400;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('請先上傳左右兩張圖片，再按「合併」', canvas.width / 2, canvas.height / 2);
+    }
+
+    function mergeImages() {
+      if (!leftImage || !rightImage) {
+        alert('請先上傳左右兩張圖片');
+        return;
+      }
+
+      const rightW = getPositiveNumber(rightWidthInput, rightImage.naturalWidth);
+      const rightH = getPositiveNumber(rightHeightInput, rightImage.naturalHeight);
+      const fitMode = document.querySelector('input[name="leftFitMode"]:checked').value;
+      const fadePx = Math.max(5, Math.min(300, Number(fadeRange.value) || 10));
+
+      let leftW, leftH;
+      const leftRatio = leftImage.naturalWidth / leftImage.naturalHeight;
+
+      if (fitMode === 'height') {
+        leftH = rightH;
+        leftW = leftH * leftRatio;
+      } else {
+        leftW = rightW;
+        leftH = leftW / leftRatio;
+      }
+
+      canvas.width = rightW;
+      canvas.height = rightH;
+      ctx.clearRect(0, 0, rightW, rightH);
+
+      // 先畫右圖（底圖）
+      ctx.drawImage(rightImage, 0, 0, rightW, rightH);
+
+      // 產生左圖遮罩後再覆蓋到底圖上
+      const overlayCanvas = document.createElement('canvas');
+      overlayCanvas.width = Math.max(1, Math.round(leftW));
+      overlayCanvas.height = Math.max(1, Math.round(leftH));
+      const octx = overlayCanvas.getContext('2d');
+
+      // 先畫左圖
+      octx.drawImage(leftImage, 0, 0, overlayCanvas.width, overlayCanvas.height);
+
+      // 用 destination-in 套用透明遮罩，做邊緣漸層刷淡
+      octx.globalCompositeOperation = 'destination-in';
+      let grad;
+
+      if (fitMode === 'height') {
+        const effectiveFade = Math.min(fadePx, overlayCanvas.width / 2);
+        grad = octx.createLinearGradient(0, 0, overlayCanvas.width, 0);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(effectiveFade / overlayCanvas.width, 'rgba(0,0,0,1)');
+        grad.addColorStop(1 - (effectiveFade / overlayCanvas.width), 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+      } else {
+        const effectiveFade = Math.min(fadePx, overlayCanvas.height / 2);
+        grad = octx.createLinearGradient(0, 0, 0, overlayCanvas.height);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(effectiveFade / overlayCanvas.height, 'rgba(0,0,0,1)');
+        grad.addColorStop(1 - (effectiveFade / overlayCanvas.height), 'rgba(0,0,0,1)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+      }
+
+      octx.fillStyle = grad;
+      octx.fillRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      octx.globalCompositeOperation = 'source-over';
+
+      // 再畫左圖（上層，置中）
+      const x = (rightW - leftW) / 2;
+      const y = (rightH - leftH) / 2;
+      ctx.drawImage(overlayCanvas, x, y, leftW, leftH);
+    }
+
+    mergeBtn.addEventListener('click', mergeImages);
+
+    downloadBtn.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'merged-image.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    resetAllBtn.addEventListener('click', () => {
+      clearLeftBtn.click();
+      clearRightBtn.click();
+      drawEmptyState();
+    });
+
+    drawEmptyState();
+  </script>
+</body>
+</html>
