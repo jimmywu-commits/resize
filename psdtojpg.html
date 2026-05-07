@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSD 轉 JPG 工具</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f3;
+    color: #1a1a18;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  .container { width: 100%; max-width: 680px; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 1.5rem; }
+  #drop-zone {
+    border: 1.5px dashed #b0afa8;
+    border-radius: 12px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    background: #fff;
+  }
+  #drop-zone:hover, #drop-zone.over { background: #f0efea; }
+  .upload-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 12px;
+    background: #f0efea;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #drop-zone p.main { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  #drop-zone p.sub { font-size: 13px; color: #888780; }
+  #file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  #options {
+    display: none; margin-top: 1rem;
+    background: #f0efea; border-radius: 8px; padding: 1rem 1.25rem;
+  }
+  .opts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; }
+  label { font-size: 12px; color: #888780; display: block; margin-bottom: 4px; }
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { flex: 1; accent-color: #378ADD; }
+  .slider-val { font-size: 13px; font-weight: 500; min-width: 36px; }
+  #status {
+    display: none; margin-top: 1rem;
+    font-size: 13px; color: #888780; text-align: center; padding: 8px;
+  }
+  #status.error { color: #a32d2d; }
+  #preview-area { display: none; margin-top: 1.25rem; }
+  .preview-wrap {
+    background: #e8e8e3; border-radius: 12px;
+    padding: 1rem; text-align: center;
+    background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #e0e0e0;
+  }
+  #preview-canvas {
+    max-width: 100%; max-height: 400px; border-radius: 4px;
+    display: block; margin: 0 auto;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+  }
+  #info-row {
+    display: flex; gap: 8px; margin-top: 12px;
+    flex-wrap: wrap; align-items: center;
+  }
+  #file-info { font-size: 12px; color: #888780; flex: 1; min-width: 0; }
+  button {
+    font-size: 13px; padding: 6px 16px; cursor: pointer;
+    border-radius: 8px; border: 0.5px solid #b0afa8;
+    background: #fff; color: #1a1a18;
+    font-family: inherit;
+    transition: background 0.1s;
+    white-space: nowrap;
+  }
+  button:hover { background: #f0efea; }
+  #download-btn {
+    background: #e6f1fb; color: #185fa5;
+    border-color: #85b7eb;
+  }
+  #download-btn:hover { background: #b5d4f4; }
+  #batch-area { display: none; margin-top: 1rem; }
+  #batch-area > p { font-size: 13px; color: #888780; margin-bottom: 8px; }
+  #batch-list { display: flex; flex-direction: column; gap: 6px; }
+  .batch-row {
+    display: flex; align-items: center; gap: 10px;
+    background: #f0efea; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px;
+  }
+  .batch-row .name { flex: 1; color: #1a1a18; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batch-row .st { color: #888780; white-space: nowrap; }
+  .batch-row .st.err { color: #a32d2d; }
+  .dl-link {
+    font-size: 12px; padding: 3px 10px; border-radius: 6px;
+    border: 0.5px solid #85b7eb; color: #185fa5;
+    background: #e6f1fb; text-decoration: none; white-space: nowrap;
+  }
+  .dl-link:hover { background: #b5d4f4; }
+  #loading-lib {
+    font-size: 13px; color: #888780; text-align: center;
+    padding: 8px; margin-top: 8px;
+  }
+  @media (max-width: 480px) {
+    .opts-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>PSD 轉 JPG</h1>
+
+  <div id="drop-zone">
+    <div class="upload-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <p class="main">拖曳 PSD 檔案到此處</p>
+    <p class="sub">或點擊選擇檔案（可多選批次轉換）</p>
+    <input type="file" id="file-input" accept=".psd" multiple>
+  </div>
+  <div id="loading-lib">載入解析函式庫中...</div>
+
+  <div id="options">
+    <div class="opts-grid">
+      <div>
+        <label>JPG 品質</label>
+        <div class="slider-row">
+          <input type="range" id="quality" min="10" max="100" value="92" step="1">
+          <span class="slider-val" id="quality-out">92%</span>
+        </div>
+      </div>
+      <div>
+        <label>縮放比例</label>
+        <div class="slider-row">
+          <input type="range" id="scale" min="10" max="100" value="100" step="5">
+          <span class="slider-val" id="scale-out">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="preview-area">
+    <div class="preview-wrap">
+      <canvas id="preview-canvas"></canvas>
+    </div>
+    <div id="info-row">
+      <span id="file-info"></span>
+      <button id="convert-btn">重新套用設定</button>
+      <button id="download-btn">下載 JPG</button>
+    </div>
+  </div>
+
+  <div id="batch-area">
+    <p>批次轉換結果</p>
+    <div id="batch-list"></div>
+  </div>
+</div>
+
+<script type="module">
+import { readPsd } from 'https://esm.sh/ag-psd@17';
+
+const loadingLib = document.getElementById('loading-lib');
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const statusEl = document.getElementById('status');
+const previewArea = document.getElementById('preview-area');
+const previewCanvas = document.getElementById('preview-canvas');
+const fileInfo = document.getElementById('file-info');
+const options = document.getElementById('options');
+const qualitySlider = document.getElementById('quality');
+const qualityOut = document.getElementById('quality-out');
+const scaleSlider = document.getElementById('scale');
+const scaleOut = document.getElementById('scale-out');
+const downloadBtn = document.getElementById('download-btn');
+const convertBtn = document.getElementById('convert-btn');
+const batchArea = document.getElementById('batch-area');
+const batchList = document.getElementById('batch-list');
+
+let currentPsdData = null;
+let currentFileName = '';
+let renderedCanvas = null;
+
+loadingLib.textContent = '函式庫載入完成，可以開始使用。';
+setTimeout(() => { loadingLib.style.display = 'none'; }, 1500);
+
+qualitySlider.addEventListener('input', () => { qualityOut.textContent = qualitySlider.value + '%'; });
+scaleSlider.addEventListener('input', () => { scaleOut.textContent = scaleSlider.value + '%'; });
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('over'); });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.psd'));
+  if (files.length === 0) { showStatus('請拖入 .psd 檔案', true); return; }
+  if (files.length === 1) processSingle(files[0]);
+  else processBatch(files);
+});
+
+fileInput.addEventListener('change', () => {
+  const files = Array.from(fileInput.files);
+  if (files.length === 1) processSingle(files[0]);
+  else if (files.length > 1) processBatch(files);
+  fileInput.value = '';
+});
+
+function showStatus(msg, isErr) {
+  statusEl.style.display = 'block';
+  statusEl.textContent = msg;
+  statusEl.className = isErr ? 'error' : '';
+}
+
+async function processSingle(file) {
+  batchArea.style.display = 'none';
+  showStatus('正在解析 PSD...');
+  try {
+    const buf = await file.arrayBuffer();
+    const psd = readPsd(buf, { skipLayerImageData: true, useImageData: true });
+    currentPsdData = psd;
+    currentFileName = file.name.replace(/\.psd$/i, '');
+    renderPreview(psd, file.size);
+    options.style.display = 'block';
+    statusEl.style.display = 'none';
+  } catch (e) {
+    showStatus('解析失敗：' + e.message, true);
+    console.error(e);
+  }
+}
+
+function renderPreview(psd, origSize) {
+  const scale = parseInt(scaleSlider.value) / 100;
+  const w = Math.round(psd.width * scale);
+  const h = Math.round(psd.height * scale);
+  previewCanvas.width = w;
+  previewCanvas.height = h;
+  const ctx = previewCanvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+
+  if (psd.canvas) {
+    ctx.drawImage(psd.canvas, 0, 0, w, h);
+  } else if (psd.imageData) {
+    const tmp = document.createElement('canvas');
+    tmp.width = psd.width; tmp.height = psd.height;
+    tmp.getContext('2d').putImageData(psd.imageData, 0, 0);
+    ctx.drawImage(tmp, 0, 0, w, h);
+  } else {
+    showStatus('無法取得合併影像，PSD 可能沒有儲存合併圖層', true);
+    return;
+  }
+
+  renderedCanvas = previewCanvas;
+  const kb = origSize ? (origSize / 1024).toFixed(0) : '?';
+  document.getElementById('file-info').textContent =
+    currentFileName + '.psd  ·  ' + psd.width + ' × ' + psd.height + 'px  ·  原始 ' + kb + ' KB';
+  previewArea.style.display = 'block';
+}
+
+convertBtn.addEventListener('click', () => {
+  if (currentPsdData) renderPreview(currentPsdData);
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!renderedCanvas) return;
+  const q = parseInt(qualitySlider.value) / 100;
+  const url = renderedCanvas.toDataURL('image/jpeg', q);
+  const a = document.createElement('a');
+  a.href = url; a.download = currentFileName + '.jpg'; a.click();
+});
+
+async function processBatch(files) {
+  previewArea.style.display = 'none';
+  options.style.display = 'none';
+  batchArea.style.display = 'block';
+  batchList.innerHTML = '';
+  showStatus('批次處理中 (0/' + files.length + ')...');
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const row = document.createElement('div');
+    row.className = 'batch-row';
+    row.innerHTML = '<span class="name" title="' + file.name + '">' + file.name + '</span><span class="st">處理中...</span>';
+    batchList.appendChild(row);
+    const st = row.querySelector('.st');
+
+    try {
+      const buf = await file.arrayBuffer();
+      const psd = readPsd(buf, { skipLayerImageData: true, useImageData: true });
+      const c = document.createElement('canvas');
+      c.width = psd.width; c.height = psd.height;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, c.width, c.height);
+      if (psd.canvas) ctx.drawImage(psd.canvas, 0, 0);
+      else if (psd.imageData) ctx.putImageData(psd.imageData, 0, 0);
+      else { st.textContent = '無合併圖層'; st.classList.add('err'); continue; }
+
+      const q = parseInt(qualitySlider.value) / 100;
+      const url = c.toDataURL('image/jpeg', q);
+      const name = file.name.replace(/\.psd$/i, '');
+      const dlLink = document.createElement('a');
+      dlLink.href = url; dlLink.download = name + '.jpg';
+      dlLink.textContent = '下載'; dlLink.className = 'dl-link';
+      st.textContent = psd.width + ' × ' + psd.height + 'px';
+      row.appendChild(dlLink);
+    } catch (e) {
+      st.textContent = '解析失敗'; st.classList.add('err');
+      console.error(file.name, e);
+    }
+    statusEl.textContent = '批次處理中 (' + (i + 1) + '/' + files.length + ')...';
+  }
+  showStatus('完成！共 ' + files.length + ' 個檔案');
+}
+</script>
+</body>
+</html>
