@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批次圖片壓縮工具 (500KB限制)</title>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px Tight 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #111827;
+            font-size: 24px;
+        }
+
+        .config-panel {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .config-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        select, input[type="number"] {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #3b82f6;
+            background: #eff6ff;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .upload-zone:hover {
+            background: #dbeafe;
+            border-color: #2563eb;
+        }
+
+        .upload-zone p {
+            margin: 0;
+            font-size: 16px;
+            color: #1e40af;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .status-text {
+            font-size: 14px;
+            color: #4b5563;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success { background-color: #d1fae5; color: #065f46; }
+        .badge-process { background-color: #e0f2fe; color: #0369a1; }
+        .badge-fail { background-color: #fee2e2; color: #991b1b; }
+
+        .progress-bar {
+            height: 4px;
+            width: 0%;
+            background-color: #3b82f6;
+            position: fixed;
+            top: 0;
+            left: 0;
+            transition: width 0.2s;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="container">
+    <h1>批次圖片縮放與壓縮工具</h1>
+
+    <div class="config-panel">
+        <div class="config-group">
+            <label for="maxSize">目標大小限制:</label>
+            <input type="number" id="maxSize" value="500" min="10" style="width: 80px;"> KB
+        </div>
+        <div class="config-group">
+            <label for="format">輸出格式:</label>
+            <select id="format">
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/webp">WebP</option>
+            </select>
+        </div>
+        <div class="config-group">
+            <label for="maxWidth">最大寬度限制 (選填):</label>
+            <input type="number" id="maxWidth" placeholder="不限制寬度" style="width: 110px;"> px
+        </div>
+    </div>
+
+    <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <p>拖曳多張圖片至此處，或點擊選取圖片</p>
+        <input type="file" id="fileInput" multiple accept="image/*">
+    </div>
+
+    <div class="actions">
+        <div class="status-text" id="statusText">尚未選擇檔案</div>
+        <button class="btn" id="downloadBtn" disabled>打包下載 ZIP</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>原始檔名</th>
+                    <th>原始大小</th>
+                    <th>壓縮後大小</th>
+                    <th>壓縮比</th>
+                    <th>狀態</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const resultBody = document.getElementById('resultBody');
+    const statusText = document.getElementById('statusText');
+    const progressBar = document.getElementById('progressBar');
+
+    let processedFiles = []; // 儲存已處理的二進位資料
+
+    // 拖曳事件處理
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.borderColor = '#3b82f6'; });
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.style.borderColor = '#3b82f6';
+        if (e.dataTransfer.files.length > 0) {
+            handleFiles(e.dataTransfer.files);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleFiles(e.target.files);
+        }
+    });
+
+    // 核心檔案處理流程
+    async function handleFiles(files) {
+        processedFiles = [];
+        resultBody.innerHTML = '';
+        downloadBtn.disabled = true;
+        
+        const targetSizeKB = parseFloat(document.getElementById('maxSize').value) || 500;
+        const targetSizeBytes = targetSizeKB * 1024;
+        const outputFormat = document.getElementById('format').value;
+        const maxWidthSetting = parseInt(document.getElementById('maxWidth').value) || null;
+
+        let completedCount = 0;
+        statusText.innerText = `正在處理 0 / ${files.length} 張圖片...`;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            // 建立表格列
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${file.name}</td>
+                <td>${(file.size / 1024).toFixed(1)} KB</td>
+                <td id="size-${i}">-</td>
+                <td id="ratio-${i}">-</td>
+                <td id="status-${i}"><span class="badge badge-process">處理中...</span></td>
+            `;
+            resultBody.appendChild(row);
+
+            try {
+                const compressedResult = await compressImage(file, targetSizeBytes, outputFormat, maxWidthSetting);
+                
+                // 更新處理成功的陣列
+                processedFiles.push({
+                    name: getOutputFilename(file.name, outputFormat),
+                    data: compressedResult.uint8Array
+                });
+
+                // 更新 UI
+                document.getElementById(`size-${i}`).innerText = `${(compressedResult.size / 1024).toFixed(1)} KB`;
+                document.getElementById(`ratio-${i}`).innerText = `${((compressedResult.size / file.size) * 100).toFixed(1)}%`;
+                document.getElementById(`status-${i}`).innerHTML = `<span class="badge badge-success">成功</span>`;
+            } catch (err) {
+                console.error(err);
+                document.getElementById(`status-${i}`).innerHTML = `<span class="badge badge-fail">失敗</span>`;
+            }
+
+            completedCount++;
+            const percent = (completedCount / files.length) * 100;
+            progressBar.style.width = `${percent}%`;
+            statusText.innerText = `正在處理 ${completedCount} / ${files.length} 張圖片...`;
+        }
+
+        statusText.innerText = `處理完成！共 ${processedFiles.length} 張成功。`;
+        progressBar.style.width = '0%';
+        if (processedFiles.length > 0) {
+            downloadBtn.disabled = false;
+        }
+    }
+
+    // 檔名修正（保持原名，僅換副檔名）
+    function getOutputFilename(originalName, mimeType) {
+        const ext = mimeType === 'image/webp' ? '.webp' : '.jpg';
+        const lastDotIndex = originalName.lastIndexOf('.');
+        if (lastDotIndex === -1) return originalName + ext;
+        return originalName.substring(0, lastDotIndex) + ext;
+    }
+
+    // 單張圖片二分法壓縮核心邏輯
+    function compressImage(file, maxBytes, mimeType, maxWidth) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function (event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    let width = img.width;
+                    let height = img.height;
+
+                    // 調整尺寸限制
+                    if (maxWidth && width > maxWidth) {
+                        height = (maxWidth / width) * height;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 使用二分搜尋法優化 Quality 參數以符合 500KB 限制
+                    let minQ = 0.01;
+                    let maxQ = 0.98;
+                    let bestResult = null;
+                    let iterations = 0;
+
+                    // 最多疊代 8 次，快速收斂找到符合預算的最大質
+                    while (iterations < 8) {
+                        const midQ = (minQ + maxQ) / 2;
+                        const dataUrl = canvas.toDataURL(mimeType, midQ);
+                        const u8arr = dataUrlToUint8Array(dataUrl);
+
+                        if (u8arr.length <= maxBytes) {
+                            bestResult = { uint8Array: u8arr, size: u8arr.length };
+                            minQ = midQ; // 嘗試更好的品質
+                        } else {
+                            maxQ = midQ; // 太大了，降低品質
+                        }
+                        iterations++;
+                    }
+
+                    // 如果連品質 0.01 都爆掉，就進行尺寸強制砍半降解析度
+                    if (!bestResult) {
+                        canvas.width = width * 0.7;
+                        canvas.height = height * 0.7;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const dataUrl = canvas.toDataURL(mimeType, 0.3);
+                        const u8arr = dataUrlToUint8Array(dataUrl);
+                        bestResult = { uint8Array: u8arr, size: u8arr.length };
+                    }
+
+                    resolve(bestResult);
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    }
+
+    // DataURL 轉成 fflate 可直接打包的 Uint8Array
+    function dataUrlToUint8Array(dataUrl) {
+        const base64 = dataUrl.split(',')[1];
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    // 點擊打包下載 ZIP
+    downloadBtn.addEventListener('click', () => {
+        if (processedFiles.length === 0) return;
+
+        statusText.innerText = '正在建立 ZIP 壓縮檔...';
+        
+        // 建構 fflate 所需的物件格式模型 { "file1.jpg": Uint8Array, "file2.jpg": Uint8Array }
+        const zipStructure = {};
+        processedFiles.forEach(file => {
+            zipStructure[file.name] = file.data;
+        });
+
+        // 執行無損同步打包 (僅打包不重複壓縮已壓縮的圖片，速度最快)
+        fflate.zip(zipStructure, { level: 0 }, (err, data) => {
+            if (err) {
+                statusText.innerText = '壓縮失敗。';
+                console.error(err);
+                return;
+            }
+
+            const blob = new Blob([data], { type: 'application/zip' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `compressed_images_${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            statusText.innerText = 'ZIP 下載完成！';
+        });
+    });
+</script>
+
+</body>
+</html>
